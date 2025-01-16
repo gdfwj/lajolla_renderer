@@ -112,3 +112,9 @@ inline Vector3 sample_visible_normals(const Vector3 &local_dir_in, Real alpha, c
     // Transforming the normal back to the ellipsoid configuration
     return normalize(Vector3{alpha * hemi_N.x, alpha * hemi_N.y, max(Real(0), hemi_N.z)});
 }
+
+inline Real G_m(const Vector3 &global_vector, const Frame &frame, const Real alpha_x, const Real alpha_y) {
+    Vector3 local_vector = to_local(frame, global_vector);
+    Real A_w = (sqrt(1 + (pow(local_vector[0]*alpha_x, 2) + pow(local_vector[1]*alpha_y, 2))/(local_vector[2]*local_vector[2])) - 1) / 2;
+    return 1 / (1 + A_w);
+}

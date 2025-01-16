@@ -13,18 +13,19 @@ Spectrum eval_op::operator()(const DisneyMetal &bsdf) const {
     }
     // Homework 1: implement this!
     Vector3 half_vector = normalize(dir_in+dir_out);
-    Spectrum Fm = eval(bsdf.base_color, vertex.uv, vertex.uv_screen_size, texture_pool) + (1 - eval(bsdf.base_color, vertex.uv, vertex.uv_screen_size, texture_pool)) * std::pow(1 - std::fabs(dot(half_vector, dir_out)), 5);
+    Spectrum base_color = eval(bsdf.base_color, vertex.uv, vertex.uv_screen_size, texture_pool);
+    Spectrum Fm = base_color + (1 - base_color) * pow(1 - std::fabs(dot(half_vector, dir_out)), 5);
     Real aspect = sqrt(1-0.9 * eval(bsdf.anisotropic, vertex.uv, vertex.uv_screen_size, texture_pool));
-    Real alpha_x = fmax(0.0001, pow(eval(bsdf.roughness, vertex.uv, vertex.uv_screen_size, texture_pool), 2) / aspect);
-    Real alpha_y = fmax(0.0001, pow(eval(bsdf.roughness, vertex.uv, vertex.uv_screen_size, texture_pool), 2) * aspect);
-    Real h_x2 = half_vector[0]*half_vector[0];
-    Real h_y2 = half_vector[1]*half_vector[1];
-    Real h_z2 = half_vector[2]*half_vector[2];
-    Real Dm = 1/pow((c_PI*alpha_x*alpha_y*(h_x2/alpha_x/alpha_x + h_y2/alpha_y/alpha_y + h_z2)), 2);
-    Real A_omega_in = (sqrt(1 + (pow(dir_in[0]*alpha_x, 2) + pow(dir_in[1]*alpha_y, 2))/(dir_in[2]*dir_in[2])) - 1) / 2;
-    Real G_in = 1 / (1+A_omega_in);
-    Real A_omega_out = (sqrt(1 + (pow(dir_out[0]*alpha_x, 2) + pow(dir_out[1]*alpha_y, 2))/(dir_out[2]*dir_out[2])) - 1) / 2;
-    Real G_out = 1 / (1+A_omega_out);
+    Real roughness = eval(bsdf.roughness, vertex.uv, vertex.uv_screen_size, texture_pool);
+    Real alpha_x = fmax(0.0001, pow(roughness, 2) / aspect);
+    Real alpha_y = fmax(0.0001, pow(roughness, 2) * aspect);
+    Vector3 local_half = to_local(frame, half_vector);
+    Real h_x2 = local_half[0]*local_half[0];
+    Real h_y2 = local_half[1]*local_half[1];
+    Real h_z2 = local_half[2]*local_half[2];
+    Real Dm = 1/(c_PI*alpha_x*alpha_y*pow(h_x2/alpha_x/alpha_x + h_y2/alpha_y/alpha_y + h_z2, 2));
+    Real G_in = G_m(dir_in, frame, alpha_x, alpha_y);
+    Real G_out = G_m(dir_out, frame, alpha_x, alpha_y);
     Real Gm = G_in * G_out;
     return Fm * Dm * Gm / (4 * fabs(dot(dir_in, frame.n)));
 
@@ -46,14 +47,17 @@ Real pdf_sample_bsdf_op::operator()(const DisneyMetal &bsdf) const {
 
     Vector3 half_vector = normalize(dir_in+dir_out);
     Real aspect = sqrt(1-0.9 * eval(bsdf.anisotropic, vertex.uv, vertex.uv_screen_size, texture_pool));
-    Real alpha_x = fmax(0.0001, pow(eval(bsdf.roughness, vertex.uv, vertex.uv_screen_size, texture_pool), 2) / aspect);
-    Real alpha_y = fmax(0.0001, pow(eval(bsdf.roughness, vertex.uv, vertex.uv_screen_size, texture_pool), 2) * aspect);
-    Real h_x2 = half_vector[0]*half_vector[0];
-    Real h_y2 = half_vector[1]*half_vector[1];
-    Real h_z2 = half_vector[2]*half_vector[2];
-    Real Dm = 1/pow((c_PI*alpha_x*alpha_y*(h_x2/alpha_x/alpha_x + h_y2/alpha_y/alpha_y + h_z2)), 2);
-    Real A_omega_in = (sqrt(1 + (pow(dir_in[0]*alpha_x, 2) + pow(dir_in[1]*alpha_y, 2))/(dir_in[2]*dir_in[2])) - 1) / 2;
-    Real G_in = 1 / (1+A_omega_in);
+    Real roughness = eval(bsdf.roughness, vertex.uv, vertex.uv_screen_size, texture_pool);
+    Real alpha_x = fmax(0.0001, pow(roughness, 2) / aspect);
+    Real alpha_y = fmax(0.0001, pow(roughness, 2) * aspect);
+    Vector3 local_half = to_local(frame, half_vector);
+    Vector3 loc_dir_in = to_local(frame, dir_in);
+    Vector3 loc_dir_out = to_local(frame, dir_out);
+    Real h_x2 = local_half[0]*local_half[0];
+    Real h_y2 = local_half[1]*local_half[1];
+    Real h_z2 = local_half[2]*local_half[2];
+    Real Dm = 1/(c_PI*alpha_x*alpha_y*pow(h_x2/alpha_x/alpha_x + h_y2/alpha_y/alpha_y + h_z2, 2));
+    Real G_in = G_m(dir_in, frame, alpha_x, alpha_y);
     return Dm * G_in / (4 * fabs(dot(dir_in, frame.n)));
 }
 
