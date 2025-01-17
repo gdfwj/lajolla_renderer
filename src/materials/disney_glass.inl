@@ -70,7 +70,6 @@ Spectrum eval_op::operator()(const DisneyGlass &bsdf) const {
         // See Chapter 5 of Eric Veach's thesis "Robust Monte Carlo Methods for Light Transport Simulation"
         // for more details.
         // Real eta_factor = dir == TransportDirection::TO_LIGHT ? (1 / (eta * eta)) : 1;
-        Real h_dot_out = dot(half_vector, dir_out);
         Real sqrt_denom = h_dot_in + eta * h_dot_out;
         // Very complicated BSDF. See Walter et al.'s paper for more details.
         // "Microfacet Models for Refraction through Rough Surfaces"
@@ -144,7 +143,7 @@ std::optional<BSDFSampleRecord>
         frame = -frame;
     }
     // Homework 1: implement this!
-    Real eta = bsdf.eta;
+    Real eta = dot(vertex.geometric_normal, dir_in) > 0 ? bsdf.eta : 1 / bsdf.eta;
     Real roughness = eval(
         bsdf.roughness, vertex.uv, vertex.uv_screen_size, texture_pool);
     // Clamp roughness to avoid numerical issues.
@@ -164,7 +163,15 @@ std::optional<BSDFSampleRecord>
     // Now we need to decide whether to reflect or refract.
     // We do this using the Fresnel term.
     Real h_dot_in = dot(half_vector, dir_in);
-    Real F = fresnel_dielectric(h_dot_in, eta);
+    Real h_dot_out_sq = 1 - (1 - h_dot_in * h_dot_in) / (eta * eta);
+    if (h_dot_out_sq <= 0) {
+        // Total internal reflection
+        // This shouldn't really happen, as F will be 1 in this case.
+        Vector3 reflected = normalize(-dir_in + 2 * dot(dir_in, half_vector) * half_vector);
+        return BSDFSampleRecord{reflected, Real(0) /* eta */, roughness};
+    }
+    Real h_dot_out = sqrt(h_dot_out_sq);
+    Real F = fresnel_dielectric(fabs(h_dot_in), fabs(h_dot_out), eta);
 
     if (rnd_param_w <= F) {
         // Reflection
@@ -175,18 +182,14 @@ std::optional<BSDFSampleRecord>
         // Refraction
         // https://en.wikipedia.org/wiki/Snell%27s_law#Vector_form
         // (note that our eta is eta2 / eta1, and l = -dir_in)
-        Real h_dot_out_sq = 1 - (1 - h_dot_in * h_dot_in) / (eta * eta);
-        if (h_dot_out_sq <= 0) {
-            // Total internal reflection
-            // This shouldn't really happen, as F will be 1 in this case.
-            return {};
-        }
+        
         // flip half_vector if needed
         if (h_dot_in < 0) {
             half_vector = -half_vector;
         }
         Real h_dot_out= sqrt(h_dot_out_sq);
         Vector3 refracted = -dir_in / eta + (fabs(h_dot_in) / eta - h_dot_out) * half_vector;
+        assert(dot(refracted, half_vector) * dot(dir_in, half_vector)<0);
         return BSDFSampleRecord{refracted, eta, roughness};
     }
 }

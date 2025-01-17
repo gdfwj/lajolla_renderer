@@ -18,8 +18,6 @@ Spectrum eval_op::operator()(const DisneyClearcoat &bsdf) const {
     Real gloss = eval(bsdf.clearcoat_gloss, vertex.uv, vertex.uv_screen_size, texture_pool);
     Real alpha_g = (1 - gloss) * 0.1 + gloss * 0.001;
     Vector3 local_half = to_local(frame, half_vector);
-    Vector3 loc_dir_in = to_local(frame, dir_in);
-    Vector3 loc_dir_out = to_local(frame, dir_out);
     Real Dc = (alpha_g*alpha_g-1) / (c_PI * log(alpha_g*alpha_g) * (1 + (alpha_g*alpha_g-1) * local_half[2]*local_half[2]));
     Real G_in = G_m(dir_in, frame, 0.25, 0.25);
     Real G_out = G_m(dir_out, frame, 0.25, 0.25);
