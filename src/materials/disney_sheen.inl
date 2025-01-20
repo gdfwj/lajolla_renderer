@@ -16,9 +16,13 @@ Spectrum eval_op::operator()(const DisneySheen &bsdf) const {
     Vector3 half_vector = normalize(dir_in + dir_out);
     Spectrum base_color = eval(bsdf.base_color, vertex.uv, vertex.uv_screen_size, texture_pool);
     Real sheen_tint = eval(bsdf.sheen_tint, vertex.uv, vertex.uv_screen_size, texture_pool);
-    Real luminance = 0.2126 * base_color[0] + 0.7152 * base_color[1] + 0.0722 * base_color[2];
-    Spectrum Ctint = luminance>0? base_color / luminance : Vector3(1, 1, 1);
-    Spectrum Csheen = (1-sheen_tint) * Ctint + sheen_tint;
+    Real luminance_ = luminance(base_color);
+    Spectrum Ctint = luminance_>0? base_color / luminance_ : Vector3(1, 1, 1);
+    // printf("%f, %f, %f, %f, %f\n", sheen_tint, luminance, Ctint[0], Ctint[1], Ctint[2]);
+    Spectrum Csheen = (1-sheen_tint) + Ctint * sheen_tint;
+    // printf("%f, %f, %f\n", Csheen[0], Csheen[1], Csheen[2]);
+    // Spectrum test = (1-sheen_tint) * Ctint + sheen_tint;
+    // printf("%f, %f, %f\n", test[0], test[1], test[2]);
     return Csheen * pow(1-fabs(dot(half_vector, dir_out)), 5) * fabs(dot(frame.n, dir_out));
 }
 
