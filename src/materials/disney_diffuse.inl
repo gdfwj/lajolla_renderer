@@ -9,12 +9,13 @@ Spectrum eval_op::operator()(const DisneyDiffuse &bsdf) const {
     if (dot(frame.n, dir_in) < 0) {
         frame = -frame;
     }
-
+    // return fmax(dot(frame.n, dir_out), Real(0)) *
+    //        eval(bsdf.base_color, vertex.uv, vertex.uv_screen_size, texture_pool) / c_PI;
     // Homework 1: implement this!
     Real roughness = eval(bsdf.roughness, vertex.uv, vertex.uv_screen_size, texture_pool);
     roughness = std::clamp(roughness, 0.01, 1.0);
     Spectrum base_color = eval(bsdf.base_color, vertex.uv, vertex.uv_screen_size, texture_pool);
-    Real subsurface_scale = 0.5;
+    Real subsurface_scale = eval(bsdf.subsurface, vertex.uv, vertex.uv_screen_size, texture_pool);
     Vector3 half_vector = normalize(dir_in+dir_out);
     Real F_D90 = 0.5+ 2* roughness * (dot(half_vector, dir_out)*dot(half_vector, dir_out));
     Real F_in = 1+(F_D90-1)*std::pow(1-fabs(dot(frame.n, dir_in)), 5);
@@ -31,6 +32,8 @@ Spectrum eval_op::operator()(const DisneyDiffuse &bsdf) const {
         printf("%f, %f, %f\n", subsurface[0], subsurface[1], subsurface[2]);
         assert((ret[0]>0 && ret[1]>0 && ret[2]>0));
     }
+    // return base_diffuse;
+    // return subsurface;
     return (1-subsurface_scale)*base_diffuse+subsurface_scale*subsurface;
 }
 
