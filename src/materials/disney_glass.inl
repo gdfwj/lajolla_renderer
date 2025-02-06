@@ -46,6 +46,14 @@ Spectrum eval_op::operator()(const DisneyGlass &bsdf) const {
     Real h_dot_in = dot(half_vector, dir_in);
     Real h_dot_out = dot(half_vector, dir_out);
     Real F = fresnel_dielectric(fabs(h_dot_in), fabs(h_dot_out), eta);
+
+    // hw test
+    // Real F0 = ((1-eta) / (1+eta)) * ((1-eta) / (1+eta));
+    // Real cos_theta_i = dot(dir_in, frame.n);
+    // Real cos_theta_t_square = 1 - (1-cos_theta_i*cos_theta_i) / (eta*eta);
+    // F = (cos_theta_t_square>0)?F0 + (1-F0) * pow(1-sqrt(cos_theta_t_square), 5):1;
+
+
     Real alpha_x = fmax(0.0001, pow(roughness, 2) / aspect);
     Real alpha_y = fmax(0.0001, pow(roughness, 2) * aspect);
     Vector3 local_half = to_local(frame, half_vector);
@@ -117,6 +125,12 @@ Real pdf_sample_bsdf_op::operator()(const DisneyGlass &bsdf) const {
     Real h_dot_in = dot(half_vector, dir_in);
     Real h_dot_out = dot(half_vector, dir_out);
     Real F = fresnel_dielectric(fabs(h_dot_in), fabs(h_dot_out), eta);
+
+    // Real F0 = ((1-eta) / (1+eta)) * ((1-eta) / (1+eta));
+    // Real cos_theta_i = dot(dir_in, frame.n);
+    // Real cos_theta_t_square = 1 - (1-cos_theta_i*cos_theta_i) / (eta*eta);
+    // F = (cos_theta_t_square>0)?F0 + (1-F0) * pow(1-sqrt(cos_theta_t_square), 5):1;
+
     Real alpha_x = fmax(0.0001, pow(roughness, 2) / aspect);
     Real alpha_y = fmax(0.0001, pow(roughness, 2) * aspect);
     Vector3 local_half = to_local(frame, half_vector);
@@ -172,6 +186,11 @@ std::optional<BSDFSampleRecord>
     }
     Real h_dot_out = sqrt(h_dot_out_sq);
     Real F = fresnel_dielectric(fabs(h_dot_in), fabs(h_dot_out), eta);
+
+    // Real F0 = ((1-eta) / (1+eta)) * ((1-eta) / (1+eta));
+    // Real cos_theta_i = dot(dir_in, frame.n);
+    // Real cos_theta_t_square = 1 - (1-cos_theta_i*cos_theta_i) / (eta*eta);
+    // F = (cos_theta_t_square>0)?F0 + (1-F0) * pow(1-sqrt(cos_theta_t_square), 5):1;
 
     if (rnd_param_w <= F) {
         // Reflection
