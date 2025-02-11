@@ -52,3 +52,5 @@ images/
 tev
 
 .vs
+
+CMakeFiles/
