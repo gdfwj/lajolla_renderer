@@ -616,6 +616,7 @@ Spectrum next_event_estimation_heterogeneous(Vector3 p, int current_medium, cons
     Spectrum p_trans_dir = make_const_spectrum(1); // # for multiple importance sampling
     auto outer_start = std::chrono::high_resolution_clock::now();
     bool debug = false;
+    Vector3 p_origin = p;
     while(1) {
         auto outer_now = std::chrono::high_resolution_clock::now();
         // std::cout<<"in loop 3"<<shadow_bounces<<std::endl;
@@ -697,8 +698,8 @@ Spectrum next_event_estimation_heterogeneous(Vector3 p, int current_medium, cons
             Vector3 dir_out = dir_light;
             Spectrum f = eval(mat, dir_in, dir_out, *isect_out, scene.texture_pool);
             Spectrum L = emission(light, -dir_out, 0, p_prime, scene);
-            Real G = abs(dot(dir_out, p_prime.normal)) / distance_squared(p, p_prime.position);
-            Real pdf_nee = pdf_point_on_light(light, p_prime, p, scene) * light_pmf(scene, light_id) * avg(p_trans_nee);
+            Real G = abs(dot(dir_out, p_prime.normal)) / distance_squared(p_origin, p_prime.position);
+            Real pdf_nee = pdf_point_on_light(light, p_prime, p_origin, scene) * light_pmf(scene, light_id) * avg(p_trans_nee);
             Spectrum contrib = T_light * G * f * L / pdf_nee;
             Real pdf_bsdf = pdf_sample_bsdf(mat, dir_in, dir_light, *isect_out, scene.texture_pool) * avg(p_trans_dir) * G;
             // Real pdf_phase = pdf_sample_phase(phase_fuc, dir_in, dir_out) * G * p_trans_dir;
@@ -709,8 +710,8 @@ Spectrum next_event_estimation_heterogeneous(Vector3 p, int current_medium, cons
             PhaseFunction phase_fuc = get_phase_function(scene.media[shadow_medium]);
             Spectrum rho = eval(phase_fuc, dir_in, dir_out);
             Spectrum L = emission(light, -dir_out, 0, p_prime, scene);
-            Real G = abs(dot(dir_out, p_prime.normal)) / distance_squared(p, p_prime.position);
-            Real pdf_nee = pdf_point_on_light(light, p_prime, p, scene) * light_pmf(scene, light_id) * avg(p_trans_nee);
+            Real G = abs(dot(dir_out, p_prime.normal)) / distance_squared(p_origin, p_prime.position);
+            Real pdf_nee = pdf_point_on_light(light, p_prime, p_origin, scene) * light_pmf(scene, light_id) * avg(p_trans_nee);
             Spectrum contrib = T_light * G * rho * L / pdf_nee;
             Real pdf_phase = pdf_sample_phase(phase_fuc, dir_in, dir_out) * G * avg(p_trans_dir);
             Real w = (pdf_nee * pdf_nee) / (pdf_nee * pdf_nee + pdf_phase * pdf_phase);
@@ -859,7 +860,6 @@ Spectrum vol_path_tracing(const Scene &scene,
                 nee_p_cache = ray.org;
                 multi_trans_pdf = make_const_spectrum(1);
                 multi_nee_pdf = make_const_spectrum(1);
-                never_scatter = false;
                 ray.tnear = get_shadow_epsilon(scene);
 
                 const Material &mat = scene.materials[isect->material_id];
@@ -910,7 +910,6 @@ Spectrum vol_path_tracing(const Scene &scene,
             Spectrum dir_out = normalize(next_dir);
             dir_pdf = pdf_sample_phase(phase_fuc, dir_in, dir_out);
 
-            never_scatter = false;
             nee_p_cache = ray.org;
             // change nee
             // Spectrum nee = next_event_estimation(ray.org, current_medium, scene, rng, bounces, -ray.dir);
@@ -936,6 +935,7 @@ Spectrum vol_path_tracing(const Scene &scene,
             }
         }
         bounces += 1;
+        never_scatter = false;
         // printf("out rr_prob\n");
     }
     return radiance;

@@ -21,7 +21,11 @@
 		<float name="radius" value="0.75"/>
 
 		<ref name="interior" id="medium"/>
+		<bsdf type="diffuse" id="diffmat">
+			<rgb name="reflectance" value="0.5 0.5 0.5"/>
+		</bsdf>
 	</shape>
+	
 
 	<shape type="sphere">
 		<point name="center" x="1" y="1" z="-1"/>
