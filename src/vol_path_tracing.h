@@ -603,7 +603,7 @@ Spectrum vol_path_tracing_5(const Scene &scene,
     return radiance;
 }
 
-Spectrum next_event_estimation_heterogeneous(Vector3 p, int current_medium, const Scene &scene, pcg32_state &rng, int bounces, Vector3 dir_in, const std::optional<PathVertex> &isect) {
+Spectrum next_event_estimation_heterogeneous(Vector3 p, int current_medium, const Scene &scene, pcg32_state &rng, int bounces, Vector3 dir_in, const std::optional<PathVertex> &isect_out) {
     int light_id = sample_light(scene, next_pcg32_real<Real>(rng));
     Light light = scene.lights[light_id];
     PointAndNormal p_prime = sample_point_on_light(light, p, Vector2(next_pcg32_real<Real>(rng), next_pcg32_real<Real>(rng)), next_pcg32_real<Real>(rng), scene);
@@ -614,12 +614,25 @@ Spectrum next_event_estimation_heterogeneous(Vector3 p, int current_medium, cons
     Spectrum T_light = make_const_spectrum(1);
     Spectrum p_trans_nee = make_const_spectrum(1);
     Spectrum p_trans_dir = make_const_spectrum(1); // # for multiple importance sampling
-    while (1) {
+    auto outer_start = std::chrono::high_resolution_clock::now();
+    bool debug = false;
+    while(1) {
+        auto outer_now = std::chrono::high_resolution_clock::now();
         // std::cout<<"in loop 3"<<shadow_bounces<<std::endl;
-        Ray shadow_ray = Ray{p, normalize(p_prime.position - p), get_shadow_epsilon(scene), (1-get_shadow_epsilon(scene)) * distance(p_prime.position,p)};
+        Ray shadow_ray = Ray{p, normalize(p_prime.position - p), get_shadow_epsilon(scene), (1-get_shadow_epsilon(scene)) * distance(p_prime.position, p)};
+        
         RayDifferential ray_diff = RayDifferential{Real(0), Real(0)};
         std::optional<PathVertex> isect = intersect(scene, shadow_ray, ray_diff);
         Real next_t = distance(p, p_prime.position);
+        if (std::chrono::duration_cast<std::chrono::microseconds>(outer_now-outer_start).count()>100000) {
+            std::cout<<"-----------------"<<std::endl;
+            std::cout<<"loop 3 "<<shadow_bounces<<std::endl;
+            std::cout<<p<<std::endl;
+            std::cout<<p_prime.position<<std::endl;
+            std::cout<<shadow_ray.dir<<std::endl;
+            std::cout<<next_t<<std::endl;
+            debug = true;
+        }
         if (isect) {
             if (isect->material_id >=0) {
                 return make_zero_spectrum();
@@ -631,7 +644,12 @@ Spectrum next_event_estimation_heterogeneous(Vector3 p, int current_medium, cons
                 int iteration = 0;
                 Spectrum majorant = get_majorant(scene.media[shadow_medium], shadow_ray);
                 Real accum_t = 0.0;
+                auto outer_start = std::chrono::high_resolution_clock::now();
                 while(1) {
+                    auto outer_now = std::chrono::high_resolution_clock::now();
+                    if (std::chrono::duration_cast<std::chrono::microseconds>(outer_now-outer_start).count()>100000) {
+                        std::cout<<"loop 4"<<iteration<<std::endl;
+                    }
                     // std::cout<<"in loop 4"<<iteration<<std::endl;
                     if (majorant[channel]<=0) break;
                     if (iteration > scene.options.max_null_collisions) break;
@@ -667,23 +685,24 @@ Spectrum next_event_estimation_heterogeneous(Vector3 p, int current_medium, cons
                 return make_zero_spectrum();
             }
             shadow_medium = update_medium(*isect, shadow_ray, shadow_medium);
+            p = isect->position;
             
         } else {
             break;
         }
     }
     if (max(T_light)>0) {
-        if(isect) {  // if we hit a surface
-            const Material &mat = scene.materials[isect->material_id];
+        if(isect_out) {  // if we hit a surface
+            const Material &mat = scene.materials[isect_out->material_id];
             Vector3 dir_out = dir_light;
-            Spectrum f = eval(mat, dir_in, dir_out, *isect, scene.texture_pool);
+            Spectrum f = eval(mat, dir_in, dir_out, *isect_out, scene.texture_pool);
             Spectrum L = emission(light, -dir_out, 0, p_prime, scene);
             Real G = abs(dot(dir_out, p_prime.normal)) / distance_squared(p, p_prime.position);
-            Spectrum pdf_nee = pdf_point_on_light(light, p_prime, p, scene) * light_pmf(scene, light_id) * p_trans_nee;
+            Real pdf_nee = pdf_point_on_light(light, p_prime, p, scene) * light_pmf(scene, light_id) * avg(p_trans_nee);
             Spectrum contrib = T_light * G * f * L / pdf_nee;
-            Spectrum pdf_bsdf = pdf_sample_bsdf(mat, dir_in, dir_light, *isect, scene.texture_pool) * p_trans_dir * G;
+            Real pdf_bsdf = pdf_sample_bsdf(mat, dir_in, dir_light, *isect_out, scene.texture_pool) * avg(p_trans_dir) * G;
             // Real pdf_phase = pdf_sample_phase(phase_fuc, dir_in, dir_out) * G * p_trans_dir;
-            Spectrum w = (pdf_nee * pdf_nee) / (pdf_nee * pdf_nee + pdf_bsdf * pdf_bsdf);
+            Real w = (pdf_nee * pdf_nee) / (pdf_nee * pdf_nee + pdf_bsdf * pdf_bsdf);
             return w * contrib;
         } else {// if scattering
             Vector3 dir_out = dir_light;
@@ -691,10 +710,10 @@ Spectrum next_event_estimation_heterogeneous(Vector3 p, int current_medium, cons
             Spectrum rho = eval(phase_fuc, dir_in, dir_out);
             Spectrum L = emission(light, -dir_out, 0, p_prime, scene);
             Real G = abs(dot(dir_out, p_prime.normal)) / distance_squared(p, p_prime.position);
-            Spectrum pdf_nee = pdf_point_on_light(light, p_prime, p, scene) * light_pmf(scene, light_id) * p_trans_nee;
+            Real pdf_nee = pdf_point_on_light(light, p_prime, p, scene) * light_pmf(scene, light_id) * avg(p_trans_nee);
             Spectrum contrib = T_light * G * rho * L / pdf_nee;
-            Spectrum pdf_phase = pdf_sample_phase(phase_fuc, dir_in, dir_out) * G * p_trans_dir;
-            Spectrum w = (pdf_nee * pdf_nee) / (pdf_nee * pdf_nee + pdf_phase * pdf_phase);
+            Real pdf_phase = pdf_sample_phase(phase_fuc, dir_in, dir_out) * G * avg(p_trans_dir);
+            Real w = (pdf_nee * pdf_nee) / (pdf_nee * pdf_nee + pdf_phase * pdf_phase);
             return w * contrib;
         }
     }
@@ -722,9 +741,15 @@ Spectrum vol_path_tracing(const Scene &scene,
     Real dir_pdf = 0;
     Spectrum nee_p_cache = make_zero_spectrum();
     Spectrum multi_trans_pdf = make_const_spectrum(1);
+    Spectrum multi_nee_pdf = make_const_spectrum(1);
     bool never_scatter = true;
     Real eta_scale = 1.0;
+    auto outer_start = std::chrono::high_resolution_clock::now();
     while(1) {
+        auto outer_now = std::chrono::high_resolution_clock::now();
+        if (std::chrono::duration_cast<std::chrono::microseconds>(outer_now-outer_start).count()>100000) {
+            std::cout<<"loop 1"<<bounces<<std::endl;
+        }
         // std::cout<<"in loop 1 "<<bounces<<std::endl;
         bool scatter = false;
         ray.tnear = get_intersection_epsilon(scene);
@@ -744,7 +769,12 @@ Spectrum vol_path_tracing(const Scene &scene,
             if (isect) {
                 t_hit = distance(ray.org, isect->position);
             }
+            auto outer_start = std::chrono::high_resolution_clock::now();
             while(1) {
+                auto outer_now = std::chrono::high_resolution_clock::now();
+                if (std::chrono::duration_cast<std::chrono::microseconds>(outer_now-outer_start).count()>100000) {
+                    std::cout<<"loop 2"<<iteration<<std::endl;
+                }
                 // std::cout<<"in loop 2"<<iteration<<std::endl;
                 if (majorant[channel]<=0) break;
                 if (iteration > scene.options.max_null_collisions) break;
@@ -753,6 +783,7 @@ Spectrum vol_path_tracing(const Scene &scene,
                 accum_t = min(accum_t + t, t_hit);
                 if (t < dt) {
                     ray.org = ray.org + t * ray.dir;
+                    ray.tnear = get_intersection_epsilon(scene);
                     Spectrum sigma_a = get_sigma_a(scene.media[current_medium], ray.org);
                     Spectrum sigma_s = get_sigma_s(scene.media[current_medium], ray.org);
                     Spectrum sigma_t = sigma_a+sigma_s;
@@ -771,6 +802,7 @@ Spectrum vol_path_tracing(const Scene &scene,
                     }
                 } else {
                     ray.org = isect->position;
+                    ray.tnear = get_intersection_epsilon(scene);
                     transmittance *= exp(-majorant * dt);
                     trans_dir_pdf *= exp(-majorant * dt);
                     trans_nee_pdf *= exp(-majorant * dt);
@@ -780,8 +812,11 @@ Spectrum vol_path_tracing(const Scene &scene,
             }
         }
         multi_trans_pdf *= trans_pdf;
+        multi_nee_pdf *= trans_nee_pdf;
         current_path_throughput *= (transmittance / avg(trans_dir_pdf));
         if (!scatter && isect) {
+            ray.org = isect->position;
+            ray.tnear = get_intersection_epsilon(scene);
             if (never_scatter) {
                 // printf("in never scatter\n");
                 Spectrum Le = make_zero_spectrum();
@@ -797,11 +832,11 @@ Spectrum vol_path_tracing(const Scene &scene,
                     Light light = scene.lights[light_id];
                     PointAndNormal p_prime = {isect->position, isect->geometric_normal};
 
-                    Real pdf_nee = pdf_point_on_light(light, p_prime, nee_p_cache, scene);
+                    Real pdf_nee = pdf_point_on_light(light, p_prime, nee_p_cache, scene) * avg(multi_nee_pdf);
                     Vector3 dir_out = normalize(p_prime.position - nee_p_cache);
                     Real G = abs(dot(dir_out, p_prime.normal)) / distance_squared(nee_p_cache, p_prime.position);
-                    Spectrum dir_pdf_ = dir_pdf * multi_trans_pdf * G;
-                    Spectrum w = (dir_pdf_ * dir_pdf_) / (dir_pdf_ * dir_pdf_ + pdf_nee * pdf_nee);
+                    Real dir_pdf_ = dir_pdf * avg(multi_trans_pdf) * G;
+                    Real w = (dir_pdf_ * dir_pdf_) / (dir_pdf_ * dir_pdf_ + pdf_nee * pdf_nee);
                     Spectrum Le = emission(*isect,-ray.dir,scene);
                     radiance += current_path_throughput * Le * w;
                     // printf("out never scatter else\n");
@@ -823,6 +858,7 @@ Spectrum vol_path_tracing(const Scene &scene,
                 // bsdf
                 nee_p_cache = ray.org;
                 multi_trans_pdf = make_const_spectrum(1);
+                multi_nee_pdf = make_const_spectrum(1);
                 never_scatter = false;
                 ray.tnear = get_shadow_epsilon(scene);
 
@@ -849,6 +885,7 @@ Spectrum vol_path_tracing(const Scene &scene,
                 Real pdf_bsdf = pdf_sample_bsdf(mat, -ray.dir, dir_out, *isect, scene.texture_pool);
                 current_path_throughput *= eval(mat, -ray.dir, dir_out, *isect, scene.texture_pool) / pdf_bsdf;
                 ray.dir = dir_out;
+                ray.tnear = get_intersection_epsilon(scene);
                 current_medium = update_medium(*isect, ray, current_medium);
                 bounces += 1;
 
@@ -864,6 +901,7 @@ Spectrum vol_path_tracing(const Scene &scene,
         }
         if (scatter) {
             multi_trans_pdf = make_const_spectrum(1);
+            multi_nee_pdf = make_const_spectrum(1);
             // printf("in scatter\n");
             PhaseFunction phase_fuc = get_phase_function(scene.media[current_medium]);
             Vector3 next_dir = sample_phase_function(phase_fuc, -ray.dir, Vector2(next_pcg32_real<Real>(rng), next_pcg32_real<Real>(rng))).value();
