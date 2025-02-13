@@ -9,9 +9,9 @@
 		<point name="center" x="0" y="0" z="0"/>
 		<float name="radius" value="1.0"/>
 
-		<bsdf type="diffuse" id="diffmat">
+		<!-- <bsdf type="diffuse" id="diffmat">
 			<rgb name="reflectance" value="0.5 0.5 0.5"/>
-		</bsdf>
+		</bsdf> -->
 
 <!-- 		<bsdf type="roughplastic">
 			<rgb name="diffuseReflectance" value="0.0 0.0 0.0"/>
@@ -34,9 +34,9 @@
 			<float name="clearcoatGloss" value="0.5"/>
 		</bsdf> -->
 
-<!-- 		<bsdf type="disneysheen">
+		<bsdf type="disneysheen">
 			<rgb name="baseColor" value="0.5 0.5 0.5"/>
-		</bsdf> -->
+		</bsdf>
 	</shape>
 
 	<shape type="sphere">
@@ -66,6 +66,37 @@
 
 		<film type="hdrfilm" id="film">
 			<integer name="width" value="512"/>
+			<integer name="height" value="512"/>
+			<string name="pixelFormat" value="rgb"/>
+			<boolean name="banner" value="false"/>
+
+			<rfilter type="gaussian"/>
+		</film>
+	</sensor>
+
+	<emitter type="envmap" id="Area_002-light">
+		<string name="filename" value="../matpreview/envmap.exr"/>
+		<transform name="toWorld">
+			<rotate y="1" angle="-90"/>
+			<matrix value="-0.224951 -0.000001 -0.974370 0.000000 -0.974370 0.000000 0.224951 0.000000 0.000000 1.000000 -0.000001 8.870000 0.000000 0.000000 0.000000 1.000000 "/>
+		</transform>
+		<float name="scale" value="3"/>
+	</emitter>
+
+	<sensor type="perspective" id="Camera-camera">
+		<string name="fovAxis" value="smaller"/>
+		<float name="focusDistance" value="6.0"/>
+		<float name="fov" value="28.8415"/>
+		<transform name="toWorld">
+			<lookAt target="3.04072, -2.85176, 2.80939" origin="3.69558, -3.46243, 3.25463" up="-0.317366, 0.312466, 0.895346"/>
+		</transform>
+
+		<sampler type="independent">
+			<integer name="sampleCount" value="256"/>
+		</sampler>
+
+		<film type="hdrfilm" id="film">
+			<integer name="width" value="683"/>
 			<integer name="height" value="512"/>
 			<string name="pixelFormat" value="rgb"/>
 			<boolean name="banner" value="false"/>

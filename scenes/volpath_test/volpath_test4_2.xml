@@ -2,8 +2,8 @@
 
 <scene version="0.5.0">
 	<integrator type="volpath">
-		<integer name="maxDepth" value="6"/>
-		<integer name="version" value="4"/>
+		<integer name="maxDepth" value="-1"/>
+		<integer name="version" value="6"/>
 	</integrator>
 
 	<medium type="homogeneous" id="medium">
@@ -21,7 +21,11 @@
 		<float name="radius" value="0.75"/>
 
 		<ref name="interior" id="medium"/>
+		<bsdf type="diffuse" id="diffmat">
+			<rgb name="reflectance" value="0.5 0.5 0.5"/>
+		</bsdf>
 	</shape>
+	
 
 	<shape type="sphere">
 		<point name="center" x="1" y="1" z="-1"/>

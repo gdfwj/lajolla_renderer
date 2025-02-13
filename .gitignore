@@ -35,13 +35,22 @@
 build/
 
 # Embree binaries
-!embree/bin/*
-!embree/lib-linux/*
-!embree/lib-macos/*
-!embree/lib-win32/*
+embree/bin/*
+embree/include/*
+embree/lib-linux/*
+embree/lib-macos/*
+embree/lib-win32/*
 
 # obj files in scenes directory
 !scenes/**/*.obj
 
 #vscode related
 .vscode
+
+images/
+
+tev
+
+.vs
+
+CMakeFiles/
