@@ -1,5 +1,7 @@
 # lajolla
-UCSD CSE 272 renderer
+Forked from UCSD CSE 272 renderer
+
+Implemented disney bsdf and volume path tracing.
 
 # Build
 All the dependencies are included. Use CMake to build.
