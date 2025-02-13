@@ -688,7 +688,7 @@ Spectrum next_event_estimation_heterogeneous(Vector3 p, int current_medium, cons
                 iteration += 1;
             }
         }
-        if (!isect) {
+        if (!isect) { // reach light
             break;
         } else { // should put behind the break
             shadow_bounces += 1;
@@ -731,7 +731,6 @@ Spectrum next_event_estimation_heterogeneous(Vector3 p, int current_medium, cons
     return make_zero_spectrum();
 }
 
-
 // The final volumetric renderer: 
 // multiple chromatic heterogeneous volumes with multiple scattering
 // with MIS between next event estimation and phase function sampling
@@ -757,6 +756,11 @@ Spectrum vol_path_tracing(const Scene &scene,
     Real eta_scale = 1.0;
     // auto outer_start = std::chrono::high_resolution_clock::now();
     while(1) {
+        if (bounces>400) {
+            std::cout<<bounces<<std::endl;
+        }
+        // auto outer_now = std::chrono::high_resolution_clock::now();
+        // if (std::chrono::duration_cast<std::chrono::microseconds>(outer_now-outer_start).count()>100000) {
         // auto outer_now = std::chrono::high_resolution_clock::now();
         // if (std::chrono::duration_cast<std::chrono::microseconds>(outer_now-outer_start).count()>100000) {
         //     std::cout<<"loop 1"<<bounces<<std::endl;
@@ -844,7 +848,7 @@ Spectrum vol_path_tracing(const Scene &scene,
 
                     Real pdf_nee = pdf_point_on_light(light, p_prime, nee_p_cache, scene) * avg(multi_nee_pdf);
                     Vector3 dir_out = normalize(p_prime.position - nee_p_cache);
-                    Real G = abs(dot(dir_out, p_prime.normal)) / distance_squared(nee_p_cache, p_prime.position);
+                    Real G = max(-dot(dir_out, p_prime.normal), Real(0)) / distance_squared(nee_p_cache, p_prime.position);
                     Real dir_pdf_ = dir_pdf * avg(multi_trans_pdf) * G;
                     Real w = (dir_pdf_ * dir_pdf_) / (dir_pdf_ * dir_pdf_ + pdf_nee * pdf_nee);
                     Spectrum Le = emission(*isect,-ray.dir,scene);
@@ -873,7 +877,6 @@ Spectrum vol_path_tracing(const Scene &scene,
 
                 const Material &mat = scene.materials[isect->material_id];
                 // change nee
-                // Spectrum nee_bsdf = next_event_estimation_on_surface(ray.org, current_medium, scene, rng, bounces, -ray.dir, isect);
                 // std::cout<<"bsdf"<<std::endl;
                 Spectrum nee_bsdf = next_event_estimation_heterogeneous(ray.org, current_medium, scene, rng, bounces, -ray.dir, isect);
 
@@ -923,7 +926,6 @@ Spectrum vol_path_tracing(const Scene &scene,
             // change nee
             // Spectrum nee = next_event_estimation(ray.org, current_medium, scene, rng, bounces, -ray.dir);
             // std::cout<<"scatter"<<std::endl;
-            // Spectrum nee = next_event_estimation(ray.org, current_medium, scene, rng, bounces, -ray.dir);
 
             Spectrum nee = next_event_estimation_heterogeneous(ray.org, current_medium, scene, rng, bounces, -ray.dir, std::nullopt);
 

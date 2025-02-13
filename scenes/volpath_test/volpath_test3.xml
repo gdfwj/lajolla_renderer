@@ -11,9 +11,9 @@
 		<rgb name="sigmaS" value="5 5 5"/>
 		<float name="scale" value="0.05"/>
 
-		<phase type="hg">
+		<!-- <phase type="hg">
 			<float name="g" value="0"/>
-		</phase>
+		</phase> -->
 	</medium>
 
 	<medium type="homogeneous" id="medium2">
